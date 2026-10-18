@@ -1,0 +1,33 @@
+# Environnement Python
+.venv/
+venv/
+env/
+
+# Fichiers Python temporaires
+__pycache__/
+*.py[cod]
+
+# Informations confidentielles
+.env
+.streamlit/secrets.toml
+
+# Editeurs
+.vscode/
+.idea/
+
+# Systeme
+Thumbs.db
+.DS_Store
+
+# Fichiers temporaires
+*.log
+*.tmp
+
+# Donnees brutes : ne pas publier automatiquement
+data/raw/
+
+# Donnees preparees : verifier avant publication
+data/processed/
+
+# Rapports et resultats locaux
+reports/
