@@ -27,7 +27,7 @@ Thumbs.db
 data/raw/
 
 # Donnees preparees : verifier avant publication
-data/processed/
+
 
 # Rapports et resultats locaux
 reports/
