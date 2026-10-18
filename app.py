@@ -1,13 +1,13 @@
 from pathlib import Path
 
 import pandas as pd
-import streamlit as st
 import plotly.express as px
+import streamlit as st
 
 
-# ==================================================
+# =====================================================
 # CONFIGURATION
-# ==================================================
+# =====================================================
 
 RACINE = Path(__file__).resolve().parent
 
@@ -22,281 +22,334 @@ st.set_page_config(
     page_title="Sénégal Emploi Analytics",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
+
+
+# =====================================================
+# DESIGN BLEU NUIT ET BLANC
+# =====================================================
 
 st.markdown(
     """
     <style>
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+    .stApp {
+        background-color: #F4F7FB;
     }
 
-    h1 {
-        font-weight: 800;
+    [data-testid="stSidebar"] {
+        background-color: #10243A;
     }
 
-    [data-testid="stMetric"] {
-        background-color: #f0f5fa;
-        border: 1px solid #d9e2ec;
-        padding: 18px;
+    [data-testid="stSidebar"] * {
+        color: #FFFFFF;
+    }
+
+    .hero {
+        background: linear-gradient(120deg, #10243A, #1F4568);
+        padding: 30px;
+        border-radius: 16px;
+        color: white;
+        margin-bottom: 24px;
+    }
+
+    .hero h1 {
+        color: white;
+        font-size: 35px;
+        margin-bottom: 8px;
+    }
+
+    .hero p {
+        color: #DCE7F3;
+        font-size: 16px;
+    }
+
+    div[data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #DCE4EF;
         border-radius: 12px;
+        padding: 18px;
+        box-shadow: 0 3px 10px rgba(16, 36, 58, 0.05);
     }
 
-    [data-testid="stMetricValue"] {
-        font-size: 1.8rem;
+    h2, h3 {
+        color: #10243A;
+    }
+
+    div[data-testid="stPlotlyChart"] {
+        background: white;
+        border-radius: 12px;
+        padding: 10px;
+        border: 1px solid #DCE4EF;
     }
 
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
-# ==================================================
+# =====================================================
 # CHARGEMENT DES DONNEES
-# ==================================================
+# =====================================================
 
 @st.cache_data
 def charger_donnees():
+    if not FICHIER_DONNEES.exists():
+        raise FileNotFoundError(
+            f"Fichier de données introuvable : {FICHIER_DONNEES}"
+        )
+
     df = pd.read_csv(FICHIER_DONNEES)
 
+    colonnes = {
+        "indicateur",
+        "secteur",
+        "annee",
+        "trimestre",
+        "valeur",
+    }
+
+    manquantes = colonnes - set(df.columns)
+
+    if manquantes:
+        raise ValueError(
+            f"Colonnes manquantes dans le CSV : {manquantes}"
+        )
+
     df["annee"] = pd.to_numeric(
-        df["annee"],
-        errors="raise"
+        df["annee"], errors="raise"
     ).astype(int)
 
     df["valeur"] = pd.to_numeric(
-        df["valeur"],
-        errors="raise"
+        df["valeur"], errors="raise"
     )
 
-    df["secteur"] = (
-        df["secteur"]
-        .astype(str)
-        .str.strip()
-    )
-
-    df["indicateur"] = (
-        df["indicateur"]
-        .astype(str)
-        .str.strip()
-    )
+    df["secteur"] = df["secteur"].astype(str).str.strip()
+    df["indicateur"] = df["indicateur"].astype(str).str.strip()
+    df["trimestre"] = df["trimestre"].astype(str).str.strip()
 
     return df
 
 
-# ==================================================
-# TITRE
-# ==================================================
-
-st.title("📊 Sénégal Emploi Analytics")
-
-st.subheader(
-    "Exploration des données trimestrielles de l'emploi au Sénégal"
-)
-
-st.markdown(
-    """
-    Ce tableau de bord permet d'explorer les données d'effectifs,
-    de rémunération et d'heures de travail issues du fichier Excel
-    utilisé pour ce projet.
-
-    Les résultats doivent être interprétés selon les définitions,
-    les unités et la méthodologie de la source.
-    """
-)
-with st.expander("À propos du projet"):
-
-    st.markdown(
-        """
-        **Sénégal Emploi Analytics** est un projet de portfolio
-        consacré à l'exploration des données trimestrielles de l'emploi.
-
-        **Indicateurs étudiés :**
-        - Effectifs
-        - Rémunération
-        - Heures de travail
-
-        **Période étudiée :** 2019–2025.
-
-        **Source des données :** fichier Excel de l'ANSD utilisé
-        dans ce projet.
-
-        **Objectif :** explorer les évolutions temporelles et comparer
-        les valeurs observées selon les secteurs.
-
-        **Limites :** les unités, les définitions des indicateurs et
-        les relations entre secteurs et agrégats doivent être vérifiées
-        dans la documentation méthodologique avant toute conclusion.
-        """
-    )
-
 if not FICHIER_DONNEES.exists():
     st.error(
-        "Le fichier de données est introuvable : "
-        "data/processed/emploi_senegal_long.csv"
+        "Le fichier de données est introuvable. "
+        "Vérifie le dossier data/processed/."
     )
     st.stop()
 
-df = charger_donnees()
+try:
+    df = charger_donnees()
+except Exception as erreur:
+    st.error(f"Impossible de charger les données : {erreur}")
+    st.stop()
 
 
-# ==================================================
-# FILTRES
-# ==================================================
+# =====================================================
+# EN-TETE
+# =====================================================
 
-st.sidebar.header("Filtres")
-
-indicateurs = {
-    "Effectifs": "effectifs",
-    "Rémunération": "remuneration",
-    "Heures de travail": "heures_travail"
-}
-
-choix_indicateur = st.sidebar.selectbox(
-    "Choisir un indicateur",
-    list(indicateurs.keys())
+st.markdown(
+    """
+    <div class="hero">
+        <h1>📊 Sénégal Emploi Analytics</h1>
+        <p>
+            Tableau de bord interactif consacré à l'exploration
+            des données trimestrielles de l'emploi au Sénégal.
+        </p>
+        <p>
+            Période disponible : 2019–2025 |
+            Analyse sectorielle et temporelle
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
-indicateur = indicateurs[choix_indicateur]
 
-donnees_indicateur = df[
+# =====================================================
+# FILTRES
+# =====================================================
+
+st.sidebar.title("ESPACE D'ANALYSE")
+st.sidebar.caption("Personnalise ton exploration des données")
+
+noms_indicateurs = {
+    "Effectifs": "effectifs",
+    "Rémunération": "remuneration",
+    "Heures de travail": "heures_travail",
+}
+
+choix = st.sidebar.selectbox(
+    "Indicateur étudié",
+    list(noms_indicateurs.keys()),
+)
+
+indicateur = noms_indicateurs[choix]
+
+df_indicateur = df[
     df["indicateur"] == indicateur
 ].copy()
 
 annees_disponibles = sorted(
-    donnees_indicateur["annee"].unique()
+    df_indicateur["annee"].unique().tolist()
 )
 
-annees_choisies = st.sidebar.multiselect(
-    "Choisir les années",
+annees_selectionnees = st.sidebar.multiselect(
+    "Années",
     annees_disponibles,
-    default=annees_disponibles
+    default=annees_disponibles,
 )
 
 secteurs_disponibles = sorted(
-    donnees_indicateur["secteur"].dropna().unique()
+    df_indicateur["secteur"].dropna().unique().tolist()
 )
 
-secteurs_choisis = st.sidebar.multiselect(
-    "Choisir les secteurs",
+secteurs_selectionnes = st.sidebar.multiselect(
+    "Secteurs",
     secteurs_disponibles,
-    default=secteurs_disponibles
+    default=secteurs_disponibles,
 )
 
-if not annees_choisies or not secteurs_choisis:
-    st.warning(
-        "Sélectionne au moins une année et un secteur."
-    )
+st.sidebar.markdown("---")
+
+st.sidebar.info(
+    "Les résultats sont descriptifs. "
+    "Les unités et les définitions doivent être vérifiées "
+    "avant toute conclusion économique."
+)
+
+if not annees_selectionnees or not secteurs_selectionnes:
+    st.warning("Sélectionne au moins une année et un secteur.")
     st.stop()
 
-donnees_filtrees = donnees_indicateur[
-    donnees_indicateur["annee"].isin(annees_choisies)
-    & donnees_indicateur["secteur"].isin(secteurs_choisis)
+donnees = df_indicateur[
+    df_indicateur["annee"].isin(annees_selectionnees)
+    & df_indicateur["secteur"].isin(secteurs_selectionnes)
 ].copy()
+
+if donnees.empty:
+    st.warning("Aucune donnée ne correspond à ces filtres.")
+    st.stop()
+
+
+# =====================================================
+# PREPARATION DES PERIODES
+# =====================================================
 
 ordre_trimestres = {
     "T1": 1,
     "T2": 2,
     "T3": 3,
-    "T4": 4
+    "T4": 4,
 }
 
-donnees_filtrees["numero_trimestre"] = (
-    donnees_filtrees["trimestre"]
-    .map(ordre_trimestres)
+donnees["numero_trimestre"] = (
+    donnees["trimestre"].map(ordre_trimestres)
 )
 
-donnees_filtrees = donnees_filtrees.sort_values(
+donnees = donnees.sort_values(
     ["annee", "numero_trimestre"]
 )
 
-donnees_filtrees["periode"] = (
-    donnees_filtrees["annee"].astype(str)
+donnees["periode"] = (
+    donnees["annee"].astype(str)
     + "-"
-    + donnees_filtrees["trimestre"].astype(str)
+    + donnees["trimestre"]
 )
 
 
-# ==================================================
-# INDICATEURS CLES
-# ==================================================
+# =====================================================
+# CARTES KPI
+# =====================================================
 
-st.markdown("---")
-st.header("Vue d'ensemble")
+st.subheader("Vue d'ensemble")
 
-col1, col2, col3 = st.columns(3)
+k1, k2, k3, k4 = st.columns(4)
 
-with col1:
+with k1:
     st.metric(
-        "Observations affichées",
-        f"{len(donnees_filtrees):,}".replace(",", " ")
+        "Observations",
+        f"{len(donnees):,}".replace(",", " "),
     )
 
-with col2:
+with k2:
     st.metric(
         "Secteurs sélectionnés",
-        donnees_filtrees["secteur"].nunique()
+        donnees["secteur"].nunique(),
     )
 
-with col3:
+with k3:
     st.metric(
         "Années sélectionnées",
-        donnees_filtrees["annee"].nunique()
+        donnees["annee"].nunique(),
+    )
+
+with k4:
+    derniere_periode = donnees[
+        ["annee", "numero_trimestre", "trimestre"]
+    ].dropna().sort_values(
+        ["annee", "numero_trimestre"]
+    )
+
+    if not derniere_periode.empty:
+        ligne = derniere_periode.iloc[-1]
+        texte_periode = f"{int(ligne['annee'])}-{ligne['trimestre']}"
+    else:
+        texte_periode = "Non disponible"
+
+    st.metric(
+        "Dernière période",
+        texte_periode,
     )
 
 
-# ==================================================
-# GRAPHIQUE D'EVOLUTION
-# ==================================================
+# =====================================================
+# EVOLUTION TEMPORELLE
+# =====================================================
 
 st.markdown("---")
-st.header("Évolution trimestrielle")
+st.subheader(f"📈 Évolution trimestrielle — {choix}")
 
 fig_evolution = px.line(
-    donnees_filtrees,
+    donnees,
     x="periode",
     y="valeur",
     color="secteur",
     markers=True,
-    title=f"Évolution de l'indicateur : {choix_indicateur}",
     labels={
         "periode": "Période",
         "valeur": "Valeur observée",
-        "secteur": "Secteur"
-    }
+        "secteur": "Secteur",
+    },
+    template="plotly_white",
 )
 
 fig_evolution.update_layout(
-    xaxis_tickangle=-45,
+    height=500,
+    hovermode="x unified",
     legend_title_text="Secteur",
-    hovermode="x unified"
+    margin=dict(l=20, r=20, t=30, b=70),
 )
+
+fig_evolution.update_xaxes(tickangle=-45)
 
 st.plotly_chart(
     fig_evolution,
-    use_container_width=True
+    use_container_width=True,
 )
 
 
-# ==================================================
+# =====================================================
 # COMPARAISON DES SECTEURS
-# ==================================================
+# =====================================================
 
 st.markdown("---")
-st.header("Comparaison des secteurs")
-
-st.caption(
-    "La moyenne ci-dessous est calculée sur les trimestres "
-    "sélectionnés. Elle est descriptive et ne constitue pas "
-    "nécessairement un classement officiel."
-)
+st.subheader("📊 Comparaison descriptive des secteurs")
 
 comparaison = (
-    donnees_filtrees
-    .groupby("secteur", as_index=False)["valeur"]
+    donnees.groupby("secteur", as_index=False)["valeur"]
     .mean()
     .rename(columns={"valeur": "moyenne_observee"})
     .sort_values("moyenne_observee", ascending=False)
@@ -304,71 +357,161 @@ comparaison = (
 
 fig_comparaison = px.bar(
     comparaison,
-    x="secteur",
-    y="moyenne_observee",
-    title="Moyenne observée par secteur",
+    x="moyenne_observee",
+    y="secteur",
+    orientation="h",
     labels={
+        "moyenne_observee": "Moyenne observée",
         "secteur": "Secteur",
-        "moyenne_observee": "Moyenne observée"
-    }
+    },
+    template="plotly_white",
 )
 
 fig_comparaison.update_layout(
-    xaxis_tickangle=-60
+    height=max(400, len(comparaison) * 30),
+    yaxis={"categoryorder": "total ascending"},
+    margin=dict(l=20, r=20, t=30, b=30),
 )
 
 st.plotly_chart(
     fig_comparaison,
-    use_container_width=True
+    use_container_width=True,
+)
+
+st.caption(
+    "La moyenne est calculée sur les observations filtrées. "
+    "Elle est descriptive et ne constitue pas nécessairement "
+    "un classement officiel. Les agrégats et sous-secteurs "
+    "peuvent se chevaucher."
 )
 
 
-# ==================================================
-# TABLEAU DES DONNEES
-# ==================================================
+# =====================================================
+# EVOLUTION ANNUELLE
+# =====================================================
 
 st.markdown("---")
-st.header("Données détaillées")
+st.subheader("📅 Évolution annuelle descriptive")
+
+annuel = (
+    donnees.groupby(["annee", "secteur"], as_index=False)["valeur"]
+    .mean()
+    .rename(columns={"valeur": "moyenne_trimestrielle"})
+)
+
+fig_annuel = px.line(
+    annuel,
+    x="annee",
+    y="moyenne_trimestrielle",
+    color="secteur",
+    markers=True,
+    labels={
+        "annee": "Année",
+        "moyenne_trimestrielle": "Moyenne des valeurs trimestrielles",
+        "secteur": "Secteur",
+    },
+    template="plotly_white",
+)
+
+fig_annuel.update_layout(
+    height=450,
+    hovermode="x unified",
+    legend_title_text="Secteur",
+)
+
+st.plotly_chart(
+    fig_annuel,
+    use_container_width=True,
+)
+
+st.caption(
+    "Cette visualisation présente une moyenne des valeurs trimestrielles "
+    "disponibles pour chaque secteur et chaque année. "
+    "Elle ne doit pas être interprétée comme un total annuel."
+)
+
+
+# =====================================================
+# TABLEAU DETAILLE
+# =====================================================
+
+st.markdown("---")
+st.subheader("📋 Données détaillées")
 
 colonnes = [
     "indicateur",
     "secteur",
     "annee",
     "trimestre",
-    "valeur"
+    "valeur",
 ]
 
 st.dataframe(
-    donnees_filtrees[colonnes],
+    donnees[colonnes],
     use_container_width=True,
-    hide_index=True
+    hide_index=True,
 )
 
 
-# ==================================================
+# =====================================================
 # TELECHARGEMENT
-# ==================================================
+# =====================================================
 
-csv = donnees_filtrees[colonnes].to_csv(
+csv = donnees[colonnes].to_csv(
     index=False
 ).encode("utf-8-sig")
 
 st.download_button(
-    label="Télécharger les données filtrées en CSV",
+    label="📥 Télécharger les données filtrées",
     data=csv,
-    file_name="donnees_emploi_senegal.csv",
-    mime="text/csv"
+    file_name="senegal_emploi_donnees.csv",
+    mime="text/csv",
 )
 
 
-# ==================================================
+# =====================================================
+# METHODOLOGIE
+# =====================================================
+
+st.markdown("---")
+
+with st.expander("ℹ️ À propos, source et méthodologie"):
+
+    st.markdown(
+        """
+        **Projet :** Sénégal Emploi Analytics
+
+        **Source :** fichier Excel de l'ANSD utilisé pour ce projet.
+        Le titre exact de la publication et son lien officiel restent
+        à documenter.
+
+        **Technologies :** Python, Pandas, Plotly et Streamlit.
+
+        **Indicateurs étudiés :**
+        - Effectifs
+        - Rémunération
+        - Heures de travail
+
+        **Période :** 2019–2025.
+
+        **Méthodologie :** préparation des données, contrôle de qualité,
+        statistiques descriptives et visualisations interactives.
+
+        **Limites :** les unités, les définitions des indicateurs et
+        les relations entre agrégats et sous-secteurs doivent être
+        vérifiées dans la documentation méthodologique de la source
+        avant toute interprétation économique.
+        """
+    )
+
+
+# =====================================================
 # PIED DE PAGE
-# ==================================================
+# =====================================================
 
 st.markdown("---")
 
 st.caption(
-    "Projet de portfolio : Sénégal Emploi Analytics. "
-    "Les interprétations économiques nécessitent la vérification "
-    "des unités, des définitions et des agrégats de la source."
+    "Sénégal Emploi Analytics | Projet de portfolio "
+    "en analyse de données | 2019–2025"
 )
